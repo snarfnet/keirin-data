@@ -1,0 +1,60 @@
+name: Daily Scrape
+
+on:
+  schedule:
+    # 19:00 JST = 10:00 UTC (entries for tomorrow)
+    - cron: '0 10 * * *'
+    # 21:00 JST = 12:00 UTC (odds + results)
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 playwright pandas
+          playwright install chromium
+
+      - name: Scrape entries (today + 7 days ahead)
+        run: |
+          cd scripts
+          mkdir -p data
+          python scrape_entries.py 7
+          if [ -f data/today_entries.json ]; then cp data/today_entries.json ..; fi
+          if [ -f data/upcoming_entries.json ]; then cp data/upcoming_entries.json ..; fi
+        working-directory: .
+        continue-on-error: true
+
+      - name: Scrape odds
+        run: |
+          cd scripts
+          mkdir -p data
+          python scrape_odds.py
+          if [ -f data/today_odds.json ]; then cp data/today_odds.json ..; fi
+        working-directory: .
+        continue-on-error: true
+
+      - name: Generate results
+        run: |
+          cd scripts
+          mkdir -p data
+          python scrape_results.py
+          if [ -f data/today_results.json ]; then cp data/today_results.json ..; fi
+        working-directory: .
+        continue-on-error: true
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add *.json
+          git diff --cached --quiet || git commit -m "Auto-update: $(date -u +%Y%m%d-%H%M)"
+          git push
