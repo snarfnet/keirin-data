@@ -10,10 +10,14 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -61,3 +65,10 @@ jobs:
           git add *.json
           git diff --cached --quiet || git commit -m "Auto-update: $(date -u +%Y%m%d-%H%M)"
           git push
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
