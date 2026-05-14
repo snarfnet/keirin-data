@@ -18,9 +18,18 @@ def generate_today_results(date_str=None):
     results_path = os.path.join(DATA_DIR, "race_results.csv")
     paybacks_path = os.path.join(DATA_DIR, "paybacks.csv")
 
+    def write_empty_results():
+        os.makedirs(DATA_DIR, exist_ok=True)
+        out = {"date": date_str, "results": []}
+        out_path = os.path.join(DATA_DIR, "today_results.json")
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+        print(f"No results source for {date_str}; wrote empty results -> {out_path}")
+        return out
+
     if not os.path.exists(results_path):
         print("race_results.csv not found")
-        return
+        return write_empty_results()
 
     df = pd.read_csv(results_path, encoding="utf-8-sig", dtype=str)
     df = df[df["date"] == date_str]
@@ -28,11 +37,7 @@ def generate_today_results(date_str=None):
     if df.empty:
         print(f"No results for {date_str}")
         # Create empty file
-        out = {"date": date_str, "results": []}
-        out_path = os.path.join(DATA_DIR, "today_results.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-        return out
+        return write_empty_results()
 
     # Load paybacks
     pb_df = pd.read_csv(paybacks_path, encoding="utf-8-sig", dtype=str)
