@@ -5,6 +5,7 @@ import re
 import sys
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,7 @@ from playwright.sync_api import sync_playwright
 BASE_URL = "https://keirin.netkeiba.com"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -79,7 +81,7 @@ def parse_odds_table(soup):
 def scrape_odds(date_str=None):
     """指定日の全レースオッズを取得"""
     if date_str is None:
-        date_str = datetime.now().strftime("%Y%m%d")
+        date_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
 
     os.makedirs(DATA_DIR, exist_ok=True)
     print(f"オッズ取得: {date_str}")
@@ -139,7 +141,7 @@ def scrape_odds(date_str=None):
     out_path = os.path.join(DATA_DIR, "today_odds.json")
     result = {
         "date": date_str,
-        "updated": datetime.now().strftime("%Y%m%d%H%M"),
+        "updated": datetime.now(TOKYO_TZ).strftime("%Y%m%d%H%M"),
         "races": all_odds,
     }
     with open(out_path, "w", encoding="utf-8") as f:

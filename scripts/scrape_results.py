@@ -3,15 +3,17 @@ import json
 import os
 import sys
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 
 
 def generate_today_results(date_str=None):
     if date_str is None:
-        date_str = datetime.now().strftime("%Y%m%d")
+        date_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
 
     results_path = os.path.join(DATA_DIR, "race_results.csv")
     paybacks_path = os.path.join(DATA_DIR, "paybacks.csv")

@@ -5,6 +5,7 @@ import re
 import sys
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,7 @@ from playwright.sync_api import sync_playwright
 BASE_URL = "https://keirin.netkeiba.com"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -136,7 +138,7 @@ def scrape_day(date_str, browser_page):
 def scrape_entries(days_ahead=7):
     """今日から指定日数先までの出走表を取得"""
     os.makedirs(DATA_DIR, exist_ok=True)
-    today = datetime.now()
+    today = datetime.now(TOKYO_TZ)
     all_days = {}
 
     with sync_playwright() as p:
@@ -185,7 +187,7 @@ def scrape_entries(days_ahead=7):
     upcoming_path = os.path.join(DATA_DIR, "upcoming_entries.json")
     with open(upcoming_path, "w", encoding="utf-8") as f:
         json.dump({
-            "updated": today.strftime("%Y%m%d%H%M"),
+            "updated": datetime.now(TOKYO_TZ).strftime("%Y%m%d%H%M"),
             "days": sorted(all_days.keys()),
             "races": all_races_flat,
         }, f, ensure_ascii=False, separators=(",", ":"))

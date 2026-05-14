@@ -2,6 +2,10 @@ name: Daily Scrape
 
 on:
   schedule:
+    # 07:10 JST = 22:10 UTC (morning refresh for today's races)
+    - cron: '10 22 * * *'
+    # 09:10 JST = 00:10 UTC (late morning retry)
+    - cron: '10 0 * * *'
     # 19:00 JST = 10:00 UTC (entries for tomorrow)
     - cron: '0 10 * * *'
     # 21:00 JST = 12:00 UTC (odds + results)
