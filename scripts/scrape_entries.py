@@ -104,6 +104,7 @@ def scrape_day(date_str, browser_page):
         venues[venue_name].append(rid)
 
     day_races = []
+    today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     for venue_name, rids in venues.items():
         print(f"  {venue_name}: {len(rids)}レース")
         for rid in rids:
@@ -126,6 +127,15 @@ def scrape_day(date_str, browser_page):
                     })
                     names = [e["name"] for e in entries]
                     print(f"    {race_no}R: {len(entries)}選手 ({', '.join(names[:3])}...)")
+                elif date_str > today_str:
+                    day_races.append({
+                        "race_id": rid,
+                        "venue": venue_name,
+                        "venue_cd": rid[8:10],
+                        "race_no": race_no,
+                        "entries": [],
+                    })
+                    print(f"    {race_no}R: レース予定のみ")
                 else:
                     print(f"    {race_no}R: 出走表なし")
                 time.sleep(1)
