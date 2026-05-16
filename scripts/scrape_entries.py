@@ -89,7 +89,14 @@ def parse_entry_table(soup, race_id):
     return entries
 
 
-def scrape_day(date_str, browser_page):
+def fetch_entry_html(race_id):
+    url = f"{BASE_URL}/race/entry/?race_id={race_id}"
+    r = requests.get(url, headers={**HEADERS, "Referer": url}, timeout=20)
+    r.encoding = "utf-8"
+    return r.text
+
+
+def scrape_day(date_str, browser_page=None):
     """1日分の出走表を取得（ブラウザページ再利用）"""
     race_ids = get_race_ids(date_str)
     if not race_ids:
@@ -111,11 +118,15 @@ def scrape_day(date_str, browser_page):
             race_no = int(rid[10:12])
             url = f"{BASE_URL}/race/entry/?race_id={rid}"
             try:
-                browser_page.goto(url, timeout=30000)
-                browser_page.wait_for_timeout(3000)
-                html = browser_page.content()
+                html = fetch_entry_html(rid)
                 soup = BeautifulSoup(html, "html.parser")
                 entries = parse_entry_table(soup, rid)
+                if not entries and browser_page is not None:
+                    browser_page.goto(url, timeout=30000)
+                    browser_page.wait_for_timeout(3000)
+                    html = browser_page.content()
+                    soup = BeautifulSoup(html, "html.parser")
+                    entries = parse_entry_table(soup, rid)
 
                 if entries:
                     day_races.append({
@@ -138,7 +149,7 @@ def scrape_day(date_str, browser_page):
                     print(f"    {race_no}R: レース予定のみ")
                 else:
                     print(f"    {race_no}R: 出走表なし")
-                time.sleep(1)
+                time.sleep(0.25)
             except Exception as e:
                 print(f"    {race_no}R: ERROR {e}")
 
@@ -151,10 +162,9 @@ def scrape_entries(days_ahead=7):
     today = datetime.now(TOKYO_TZ)
     all_days = {}
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-
+    fallback_browser = None
+    fallback_page = None
+    try:
         for offset in range(days_ahead + 1):
             target = today + timedelta(days=offset)
             date_str = target.strftime("%Y%m%d")
@@ -167,7 +177,14 @@ def scrape_entries(days_ahead=7):
                 print(f"  スキップ（レースなし）")
                 continue
 
-            races = scrape_day(date_str, page)
+            races = scrape_day(date_str, fallback_page)
+            needs_fallback = not races or all(not race["entries"] for race in races)
+            if needs_fallback:
+                with sync_playwright() as p:
+                    fallback_browser = p.chromium.launch(headless=True)
+                    fallback_page = fallback_browser.new_page()
+                    races = scrape_day(date_str, fallback_page)
+
             if races:
                 all_days[date_str] = races
                 # 日別ファイル保存
@@ -176,8 +193,9 @@ def scrape_entries(days_ahead=7):
                 with open(out_path, "w", encoding="utf-8") as f:
                     json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
                 print(f"  保存: {len(races)}レース -> {out_path}")
-
-        browser.close()
+    finally:
+        if fallback_browser is not None:
+            fallback_browser.close()
 
     # today_entries.json は当日分
     today_str = today.strftime("%Y%m%d")

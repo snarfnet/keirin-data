@@ -41,6 +41,7 @@ jobs:
           python scrape_entries.py 7
           if [ -f data/today_entries.json ]; then cp data/today_entries.json ..; fi
           if [ -f data/upcoming_entries.json ]; then cp data/upcoming_entries.json ..; fi
+          cp data/entries_*.json .. 2>/dev/null || true
         working-directory: .
         continue-on-error: true
 
@@ -57,7 +58,9 @@ jobs:
         run: |
           cd scripts
           mkdir -p data
-          python scrape_results.py
+          RESULT_DATE=$(python -c "from datetime import datetime, timedelta; from zoneinfo import ZoneInfo; now=datetime.now(ZoneInfo('Asia/Tokyo')); target=now if now.hour >= 21 else now - timedelta(days=1); print(target.strftime('%Y%m%d'))")
+          python scraper.py "$RESULT_DATE" "$RESULT_DATE"
+          python scrape_results.py "$RESULT_DATE"
           if [ -f data/today_results.json ]; then cp data/today_results.json ..; fi
         working-directory: .
         continue-on-error: true

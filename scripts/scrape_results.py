@@ -2,7 +2,7 @@
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -13,7 +13,9 @@ TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 
 def generate_today_results(date_str=None):
     if date_str is None:
-        date_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
+        now = datetime.now(TOKYO_TZ)
+        target = now if now.hour >= 21 else now - timedelta(days=1)
+        date_str = target.strftime("%Y%m%d")
 
     results_path = os.path.join(DATA_DIR, "race_results.csv")
     paybacks_path = os.path.join(DATA_DIR, "paybacks.csv")

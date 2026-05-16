@@ -9,6 +9,7 @@ import pandas as pd
 import time
 import os
 import json
+import sys
 from datetime import datetime, timedelta
 
 BASE_URL = "https://keirin.netkeiba.com"
@@ -192,7 +193,12 @@ def scrape_range(start_date, end_date):
 
 
 if __name__ == "__main__":
-    # 直近1週間のデータを取得（テスト）
-    end = datetime.now()
-    start = end - timedelta(days=7)
-    scrape_range(start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
+    if len(sys.argv) >= 2:
+        start_date = sys.argv[1]
+        end_date = sys.argv[2] if len(sys.argv) >= 3 else start_date
+        scrape_range(start_date, end_date)
+    else:
+        # 直近1週間のデータを取得（テスト）
+        end = datetime.now()
+        start = end - timedelta(days=7)
+        scrape_range(start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
