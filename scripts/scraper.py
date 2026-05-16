@@ -19,6 +19,8 @@ HEADERS = {
 }
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
+LIST_RETRIES = 3
+DETAIL_RETRIES = 2
 
 # 場コード→場名
 VENUE_CODES = {
@@ -41,20 +43,42 @@ def get_race_ids_for_date(date_str):
     """指定日のレースID一覧を取得 (date_str: YYYYMMDD)"""
     url = f"{BASE_URL}/race/payback_list/?kaisai_date={date_str}"
     headers = {**HEADERS, "Referer": url}
-    r = requests.get(url, headers=headers, timeout=15)
-    r.encoding = "utf-8"
-
     import re
-    ids = re.findall(r"PaybackRaceId_(\d+)", r.text)
-    return sorted(set(ids))
+    last_error = None
+    for attempt in range(1, LIST_RETRIES + 1):
+        try:
+            r = requests.get(url, headers=headers, timeout=15)
+            r.raise_for_status()
+            r.encoding = "utf-8"
+            ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", r.text)))
+            if ids or attempt == LIST_RETRIES:
+                return ids
+        except requests.RequestException as exc:
+            last_error = exc
+        if attempt < LIST_RETRIES:
+            time.sleep(2 * attempt)
+    if last_error:
+        print(f"  レースID取得失敗: {last_error}")
+    return []
 
 
 def parse_race_result(race_id):
     """個別レース結果をパース"""
     url = f"{BASE_URL}/race/payback_list/api_payback_result_v2.html?race_id={race_id}"
     headers = {**HEADERS, "Referer": f"{BASE_URL}/race/payback_list/"}
-    r = requests.get(url, headers=headers, timeout=15)
-    r.encoding = "utf-8"
+    last_error = None
+    for attempt in range(1, DETAIL_RETRIES + 1):
+        try:
+            r = requests.get(url, headers=headers, timeout=15)
+            r.raise_for_status()
+            r.encoding = "utf-8"
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < DETAIL_RETRIES:
+                time.sleep(2)
+    else:
+        raise RuntimeError(f"result fetch failed: {last_error}")
     soup = BeautifulSoup(r.text, "html.parser")
 
     tables = soup.find_all("table")

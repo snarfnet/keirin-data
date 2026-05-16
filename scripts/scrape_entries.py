@@ -15,6 +15,8 @@ BASE_URL = "https://keirin.netkeiba.com"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")
+LIST_RETRIES = 3
+DETAIL_RETRIES = 2
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -34,9 +36,22 @@ VENUE_CODES = {
 def get_race_ids(date_str):
     """指定日のレースID一覧を取得"""
     url = f"{BASE_URL}/race/payback_list/?kaisai_date={date_str}"
-    r = requests.get(url, headers={**HEADERS, "X-Requested-With": "XMLHttpRequest"}, timeout=15)
-    r.encoding = "utf-8"
-    return sorted(set(re.findall(r"PaybackRaceId_(\d+)", r.text)))
+    last_error = None
+    for attempt in range(1, LIST_RETRIES + 1):
+        try:
+            r = requests.get(url, headers={**HEADERS, "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            r.raise_for_status()
+            r.encoding = "utf-8"
+            race_ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", r.text)))
+            if race_ids or attempt == LIST_RETRIES:
+                return race_ids
+        except requests.RequestException as exc:
+            last_error = exc
+        if attempt < LIST_RETRIES:
+            time.sleep(2 * attempt)
+    if last_error:
+        print(f"  レースID取得失敗: {last_error}")
+    return []
 
 
 def parse_entry_table(soup, race_id):
@@ -91,9 +106,18 @@ def parse_entry_table(soup, race_id):
 
 def fetch_entry_html(race_id):
     url = f"{BASE_URL}/race/entry/?race_id={race_id}"
-    r = requests.get(url, headers={**HEADERS, "Referer": url}, timeout=20)
-    r.encoding = "utf-8"
-    return r.text
+    last_error = None
+    for attempt in range(1, DETAIL_RETRIES + 1):
+        try:
+            r = requests.get(url, headers={**HEADERS, "Referer": url}, timeout=20)
+            r.raise_for_status()
+            r.encoding = "utf-8"
+            return r.text
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < DETAIL_RETRIES:
+                time.sleep(2)
+    raise RuntimeError(f"entry fetch failed: {last_error}")
 
 
 def scrape_day(date_str, browser_page=None):
