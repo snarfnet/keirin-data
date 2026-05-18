@@ -12,7 +12,11 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 BASE_URL = "https://keirin.netkeiba.com"
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+}
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 LIST_RETRIES = 3
@@ -52,6 +56,15 @@ def get_race_ids(date_str):
     if last_error:
         print(f"  レースID取得失敗: {last_error}")
     return []
+
+
+def guess_race_ids(date_str):
+    """一覧が403の時用。全場コード×12Rを直接確認する。"""
+    return [
+        f"{date_str}{venue_cd}{race_no:02d}"
+        for venue_cd in sorted(VENUE_CODES.keys())
+        for race_no in range(1, 13)
+    ]
 
 
 def parse_entry_table(soup, race_id):
@@ -123,8 +136,11 @@ def fetch_entry_html(race_id):
 def scrape_day(date_str, browser_page=None):
     """1日分の出走表を取得（ブラウザページ再利用）"""
     race_ids = get_race_ids(date_str)
+    using_guessed_ids = False
     if not race_ids:
-        return []
+        using_guessed_ids = True
+        race_ids = guess_race_ids(date_str)
+        print(f"  一覧なし。直接確認に切替: {len(race_ids)}候補")
 
     venues = {}
     for rid in race_ids:
@@ -162,7 +178,7 @@ def scrape_day(date_str, browser_page=None):
                     })
                     names = [e["name"] for e in entries]
                     print(f"    {race_no}R: {len(entries)}選手 ({', '.join(names[:3])}...)")
-                elif date_str > today_str:
+                elif date_str > today_str and not using_guessed_ids:
                     day_races.append({
                         "race_id": rid,
                         "venue": venue_name,
