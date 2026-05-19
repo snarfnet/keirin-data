@@ -117,6 +117,17 @@ def parse_entry_table(soup, race_id):
     return entries
 
 
+def parse_race_meta(soup):
+    """発走時刻などのレース基本情報を取得"""
+    data = soup.find("div", class_="Race_Data")
+    text = data.get_text(" ", strip=True) if data else soup.get_text(" ", strip=True)
+    times = re.findall(r"\d{1,2}:\d{2}", text)
+    return {
+        "start_time": times[0] if times else "",
+        "close_time": times[1] if len(times) > 1 else "",
+    }
+
+
 def fetch_entry_html(race_id):
     url = f"{BASE_URL}/race/entry/?race_id={race_id}"
     last_error = None
@@ -169,11 +180,13 @@ def scrape_day(date_str, browser_page=None):
                     entries = parse_entry_table(soup, rid)
 
                 if entries:
+                    meta = parse_race_meta(soup)
                     day_races.append({
                         "race_id": rid,
                         "venue": venue_name,
                         "venue_cd": rid[8:10],
                         "race_no": race_no,
+                        **meta,
                         "entries": entries,
                     })
                     names = [e["name"] for e in entries]
@@ -214,8 +227,7 @@ def scrape_entries(days_ahead=7):
             print(f"  {len(race_ids)}レース検出")
 
             if not race_ids:
-                print(f"  スキップ（レースなし）")
-                continue
+                print("  一覧取得なし。直接確認で継続")
 
             races = scrape_day(date_str, fallback_page)
             needs_fallback = not races or all(not race["entries"] for race in races)
