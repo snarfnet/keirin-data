@@ -11,6 +11,7 @@ import os
 import json
 import sys
 from datetime import datetime, timedelta
+from playwright.sync_api import sync_playwright
 
 BASE_URL = "https://keirin.netkeiba.com"
 HEADERS = {
@@ -39,7 +40,7 @@ VENUE_CODES = {
 }
 
 
-def get_race_ids_for_date(date_str):
+def get_race_ids_for_date(date_str, browser_page=None):
     """指定日のレースID一覧を取得 (date_str: YYYYMMDD)"""
     url = f"{BASE_URL}/race/payback_list/?kaisai_date={date_str}"
     headers = {**HEADERS, "Referer": url}
@@ -59,10 +60,20 @@ def get_race_ids_for_date(date_str):
             time.sleep(2 * attempt)
     if last_error:
         print(f"  レースID取得失敗: {last_error}")
+    if browser_page is not None:
+        try:
+            browser_page.goto(url, timeout=30000)
+            browser_page.wait_for_timeout(2500)
+            ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", browser_page.content())))
+            if ids:
+                print(f"  browser fallback found {len(ids)} races")
+            return ids
+        except Exception as exc:
+            print(f"  browser race list failed: {exc}")
     return []
 
 
-def parse_race_result(race_id):
+def parse_race_result(race_id, browser_page=None):
     """個別レース結果をパース"""
     url = f"{BASE_URL}/race/payback_list/api_payback_result_v2.html?race_id={race_id}"
     headers = {**HEADERS, "Referer": f"{BASE_URL}/race/payback_list/"}
@@ -78,8 +89,13 @@ def parse_race_result(race_id):
             if attempt < DETAIL_RETRIES:
                 time.sleep(2)
     else:
-        raise RuntimeError(f"result fetch failed: {last_error}")
-    soup = BeautifulSoup(r.text, "html.parser")
+        if browser_page is None:
+            raise RuntimeError(f"result fetch failed: {last_error}")
+        browser_page.goto(url, timeout=30000)
+        browser_page.wait_for_timeout(2500)
+        soup = BeautifulSoup(browser_page.content(), "html.parser")
+    if "soup" not in locals():
+        soup = BeautifulSoup(r.text, "html.parser")
 
     tables = soup.find_all("table")
     if not tables:
@@ -158,8 +174,20 @@ def scrape_date(date_str):
     """1日分のレース結果を取得"""
     print(f"[{date_str}] レースID取得中...")
     race_ids = get_race_ids_for_date(date_str)
+    browser = None
+    page = None
+    playwright_context = None
+    if not race_ids:
+        playwright_context = sync_playwright().start()
+        browser = playwright_context.chromium.launch(headless=True)
+        page = browser.new_page()
+        race_ids = get_race_ids_for_date(date_str, page)
     if not race_ids:
         print(f"  レースなし")
+        if browser is not None:
+            browser.close()
+        if playwright_context is not None:
+            playwright_context.stop()
         return [], []
 
     print(f"  {len(race_ids)}レース検出")
@@ -168,7 +196,7 @@ def scrape_date(date_str):
 
     for race_id in race_ids:
         try:
-            results, paybacks = parse_race_result(race_id)
+            results, paybacks = parse_race_result(race_id, page)
             if results:
                 all_results.extend(results)
             if paybacks:
@@ -178,6 +206,10 @@ def scrape_date(date_str):
             print(f"  ERROR {race_id}: {e}")
 
     print(f"  取得完了: {len(all_results)}着順, {len(all_paybacks)}払戻")
+    if browser is not None:
+        browser.close()
+    if playwright_context is not None:
+        playwright_context.stop()
     return all_results, all_paybacks
 
 
