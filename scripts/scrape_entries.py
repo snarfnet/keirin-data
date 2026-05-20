@@ -37,7 +37,7 @@ VENUE_CODES = {
 }
 
 
-def get_race_ids(date_str):
+def get_race_ids(date_str, browser_page=None):
     """指定日のレースID一覧を取得"""
     url = f"{BASE_URL}/race/payback_list/?kaisai_date={date_str}"
     last_error = None
@@ -55,6 +55,16 @@ def get_race_ids(date_str):
             time.sleep(2 * attempt)
     if last_error:
         print(f"  レースID取得失敗: {last_error}")
+    if browser_page is not None:
+        try:
+            browser_page.goto(url, timeout=30000)
+            browser_page.wait_for_timeout(2500)
+            race_ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", browser_page.content())))
+            if race_ids:
+                print(f"  browser fallback found {len(race_ids)} races")
+            return race_ids
+        except Exception as exc:
+            print(f"  browser race list failed: {exc}")
     return []
 
 
@@ -146,10 +156,13 @@ def fetch_entry_html(race_id):
 
 def scrape_day(date_str, browser_page=None):
     """1日分の出走表を取得（ブラウザページ再利用）"""
-    race_ids = get_race_ids(date_str)
+    race_ids = get_race_ids(date_str, browser_page)
     today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     using_guessed_ids = False
     if not race_ids:
+        if browser_page is not None:
+            print("  race list unavailable even with browser; skip guessed deep scan")
+            return []
         if date_str > today_str:
             print("  future race list not available yet; skip guessed deep scan")
             return []
@@ -172,7 +185,14 @@ def scrape_day(date_str, browser_page=None):
             race_no = int(rid[10:12])
             url = f"{BASE_URL}/race/entry/?race_id={rid}"
             try:
-                html = fetch_entry_html(rid)
+                try:
+                    html = fetch_entry_html(rid)
+                except Exception:
+                    if browser_page is None:
+                        raise
+                    browser_page.goto(url, timeout=30000)
+                    browser_page.wait_for_timeout(2500)
+                    html = browser_page.content()
                 soup = BeautifulSoup(html, "html.parser")
                 entries = parse_entry_table(soup, rid)
                 if not entries and browser_page is not None:
@@ -220,6 +240,7 @@ def scrape_entries(days_ahead=7):
 
     fallback_browser = None
     fallback_page = None
+    playwright_context = None
     try:
         for offset in range(days_ahead + 1):
             target = today + timedelta(days=offset)
@@ -232,13 +253,18 @@ def scrape_entries(days_ahead=7):
             if not race_ids:
                 print("  一覧取得なし。直接確認で継続")
 
+            if not race_ids and fallback_page is None:
+                playwright_context = sync_playwright().start()
+                fallback_browser = playwright_context.chromium.launch(headless=True)
+                fallback_page = fallback_browser.new_page()
+
             races = scrape_day(date_str, fallback_page)
             needs_fallback = not races or all(not race["entries"] for race in races)
-            if needs_fallback:
-                with sync_playwright() as p:
-                    fallback_browser = p.chromium.launch(headless=True)
-                    fallback_page = fallback_browser.new_page()
-                    races = scrape_day(date_str, fallback_page)
+            if needs_fallback and fallback_page is None:
+                playwright_context = sync_playwright().start()
+                fallback_browser = playwright_context.chromium.launch(headless=True)
+                fallback_page = fallback_browser.new_page()
+                races = scrape_day(date_str, fallback_page)
 
             if races:
                 all_days[date_str] = races
@@ -251,6 +277,8 @@ def scrape_entries(days_ahead=7):
     finally:
         if fallback_browser is not None:
             fallback_browser.close()
+        if playwright_context is not None:
+            playwright_context.stop()
 
     # today_entries.json は当日分
     today_str = today.strftime("%Y%m%d")
