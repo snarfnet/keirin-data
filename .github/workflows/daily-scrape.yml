@@ -21,9 +21,14 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: true
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     environment:
       name: github-pages
     steps:

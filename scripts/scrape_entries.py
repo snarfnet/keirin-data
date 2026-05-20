@@ -147,8 +147,12 @@ def fetch_entry_html(race_id):
 def scrape_day(date_str, browser_page=None):
     """1日分の出走表を取得（ブラウザページ再利用）"""
     race_ids = get_race_ids(date_str)
+    today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     using_guessed_ids = False
     if not race_ids:
+        if date_str > today_str:
+            print("  future race list not available yet; skip guessed deep scan")
+            return []
         using_guessed_ids = True
         race_ids = guess_race_ids(date_str)
         print(f"  一覧なし。直接確認に切替: {len(race_ids)}候補")
@@ -162,7 +166,6 @@ def scrape_day(date_str, browser_page=None):
         venues[venue_name].append(rid)
 
     day_races = []
-    today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     for venue_name, rids in venues.items():
         print(f"  {venue_name}: {len(rids)}レース")
         for rid in rids:
