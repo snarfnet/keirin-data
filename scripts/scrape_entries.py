@@ -88,6 +88,32 @@ def parse_entry_table(soup, race_id):
 
     for row in table.find_all("tr")[1:]:
         cells = row.find_all("td")
+        if len(cells) >= 4 and len(cells) < 15:
+            waku = cells[0].text.strip()
+            umaban = cells[1].text.strip()
+            name_cell = cells[3].text.strip()
+
+            lines = [l.strip() for l in name_cell.split() if l.strip()]
+            name_kana = lines[0] if lines else ""
+            name_kanji = lines[1] if len(lines) > 1 else ""
+            name_kanji = name_kanji.replace("お気に入り選手", "").strip()
+
+            if name_kanji:
+                entries.append({
+                    "waku": int(waku) if waku.isdigit() else 0,
+                    "umaban": int(umaban) if umaban.isdigit() else 0,
+                    "name": name_kanji,
+                    "name_kana": name_kana,
+                    "score": 0,
+                    "style": "",
+                    "win_rate": 0,
+                    "top2_rate": 0,
+                    "top3_rate": 0,
+                    "gear": "",
+                    "comment": "",
+                })
+            continue
+
         if len(cells) < 15:
             continue
 
