@@ -186,9 +186,6 @@ def scrape_day(date_str, browser_page=None):
     today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     using_guessed_ids = False
     if not race_ids:
-        if browser_page is not None:
-            print("  race list unavailable even with browser; skip guessed deep scan")
-            return []
         if date_str > today_str:
             print("  future race list not available yet; skip guessed deep scan")
             return []

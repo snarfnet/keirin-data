@@ -40,13 +40,13 @@ def publish_entries():
 
     if not valid_entry_file(today_path, today):
         print("entries: invalid or empty today_entries.json; keeping previous published data")
-        return
+        raise SystemExit(1)
 
     upcoming = load_json(upcoming_path) if upcoming_path.exists() else {}
     upcoming_races = upcoming.get("races", [])
     if not upcoming_races or not any(r.get("date") == today and r.get("entries") for r in upcoming_races):
         print("entries: invalid or empty upcoming_entries.json; keeping previous published data")
-        return
+        raise SystemExit(1)
 
     copy_if_exists("today_entries.json")
     copy_if_exists("upcoming_entries.json")
