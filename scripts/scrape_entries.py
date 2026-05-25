@@ -260,12 +260,15 @@ def scrape_day(date_str, browser_page=None):
             race_no = int(rid[10:12])
             url = f"{BASE_URL}/race/entry/?race_id={rid}"
             try:
-                try:
-                    html = fetch_entry_html(rid)
-                except Exception:
-                    if browser_page is None:
-                        raise
+                if using_guessed_ids and browser_page is not None:
                     html = load_entry_html_with_browser(browser_page, url)
+                else:
+                    try:
+                        html = fetch_entry_html(rid)
+                    except Exception:
+                        if browser_page is None:
+                            raise
+                        html = load_entry_html_with_browser(browser_page, url)
                 soup = BeautifulSoup(html, "html.parser")
                 entries = parse_entry_table(soup, rid)
                 if not entries and browser_page is not None and not using_guessed_ids:
