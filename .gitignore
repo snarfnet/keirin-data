@@ -1,2 +1,4 @@
 scripts/data/
 scripts/__pycache__/
+.venv/
+logs/
