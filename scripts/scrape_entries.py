@@ -21,8 +21,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 LIST_RETRIES = 3
 DETAIL_RETRIES = 2
-BROWSER_NAV_TIMEOUT_MS = 8000
-BROWSER_WAIT_MS = 900
+BROWSER_NAV_TIMEOUT_MS = 3500
+BROWSER_WAIT_MS = 500
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -255,7 +255,8 @@ def scrape_day(date_str, browser_page=None):
     day_races = []
     for venue_name, rids in venues.items():
         print(f"  {venue_name}: {len(rids)}レース")
-        for rid in rids:
+        consecutive_missing = 0
+        for idx, rid in enumerate(rids):
             race_no = int(rid[10:12])
             url = f"{BASE_URL}/race/entry/?race_id={rid}"
             try:
@@ -267,12 +268,13 @@ def scrape_day(date_str, browser_page=None):
                     html = load_entry_html_with_browser(browser_page, url)
                 soup = BeautifulSoup(html, "html.parser")
                 entries = parse_entry_table(soup, rid)
-                if not entries and browser_page is not None:
+                if not entries and browser_page is not None and not using_guessed_ids:
                     html = load_entry_html_with_browser(browser_page, url)
                     soup = BeautifulSoup(html, "html.parser")
                     entries = parse_entry_table(soup, rid)
 
                 if entries:
+                    consecutive_missing = 0
                     meta = parse_race_meta(soup)
                     day_races.append({
                         "race_id": rid,
@@ -295,9 +297,23 @@ def scrape_day(date_str, browser_page=None):
                     print(f"    {race_no}R: レース予定のみ")
                 else:
                     print(f"    {race_no}R: 出走表なし")
+                    if using_guessed_ids:
+                        consecutive_missing += 1
+                        if consecutive_missing >= 2:
+                            remaining = len(rids) - idx - 1
+                            if remaining:
+                                print(f"    以降{remaining}レースは未開催扱いでスキップ")
+                            break
                 time.sleep(0.25)
             except Exception as e:
                 print(f"    {race_no}R: ERROR {e}")
+                if using_guessed_ids:
+                    consecutive_missing += 1
+                    if consecutive_missing >= 2:
+                        remaining = len(rids) - idx - 1
+                        if remaining:
+                            print(f"    以降{remaining}レースは未開催扱いでスキップ")
+                        break
 
     return day_races
 
