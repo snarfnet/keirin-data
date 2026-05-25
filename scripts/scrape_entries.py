@@ -21,6 +21,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 LIST_RETRIES = 3
 DETAIL_RETRIES = 2
+BROWSER_NAV_TIMEOUT_MS = 8000
+BROWSER_WAIT_MS = 900
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -75,6 +77,16 @@ def guess_race_ids(date_str):
         for venue_cd in sorted(VENUE_CODES.keys())
         for race_no in range(1, 13)
     ]
+
+
+def should_deep_scan(date_str, now=None):
+    """一覧が取れない時に直接確認する日付を絞る。"""
+    now = now or datetime.now(TOKYO_TZ)
+    today_str = now.strftime("%Y%m%d")
+    if date_str <= today_str:
+        return True
+    tomorrow_str = (now + timedelta(days=1)).strftime("%Y%m%d")
+    return date_str == tomorrow_str and now.hour >= 21
 
 
 def parse_entry_table(soup, race_id):
@@ -153,6 +165,43 @@ def parse_entry_table(soup, race_id):
     return entries
 
 
+def load_entry_html_with_browser(browser_page, url):
+    browser_page.goto(url, timeout=BROWSER_NAV_TIMEOUT_MS, wait_until="domcontentloaded")
+    browser_page.wait_for_timeout(BROWSER_WAIT_MS)
+    return browser_page.content()
+
+
+def filter_guessed_race_ids(date_str, race_ids, browser_page):
+    """ブラウザ直接確認時は、まず開催場だけを絞ってタイムアウトを避ける。"""
+    if browser_page is None:
+        return race_ids
+
+    active_venues = []
+    for venue_cd in sorted(VENUE_CODES.keys()):
+        rid = f"{date_str}{venue_cd}01"
+        url = f"{BASE_URL}/race/entry/?race_id={rid}"
+        try:
+            html = load_entry_html_with_browser(browser_page, url)
+            soup = BeautifulSoup(html, "html.parser")
+            if parse_entry_table(soup, rid):
+                active_venues.append(venue_cd)
+                print(f"  開催候補: {VENUE_CODES.get(venue_cd, venue_cd)}")
+        except Exception as exc:
+            print(f"  {VENUE_CODES.get(venue_cd, venue_cd)}: 開催確認失敗 {exc}")
+        time.sleep(0.1)
+
+    filtered = [
+        f"{date_str}{venue_cd}{race_no:02d}"
+        for venue_cd in active_venues
+        for race_no in range(1, 13)
+    ]
+    if filtered:
+        print(f"  直接確認候補を絞込: {len(race_ids)} -> {len(filtered)}")
+        return filtered
+    print("  開催場を絞り込めず。全候補で継続")
+    return race_ids
+
+
 def parse_race_meta(soup):
     """発走時刻などのレース基本情報を取得"""
     data = soup.find("div", class_="Race_Data")
@@ -183,15 +232,17 @@ def fetch_entry_html(race_id):
 def scrape_day(date_str, browser_page=None):
     """1日分の出走表を取得（ブラウザページ再利用）"""
     race_ids = get_race_ids(date_str, browser_page)
-    today_str = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
+    now = datetime.now(TOKYO_TZ)
+    today_str = now.strftime("%Y%m%d")
     using_guessed_ids = False
     if not race_ids:
-        if date_str > today_str:
+        if not should_deep_scan(date_str, now):
             print("  future race list not available yet; skip guessed deep scan")
             return []
         using_guessed_ids = True
         race_ids = guess_race_ids(date_str)
         print(f"  一覧なし。直接確認に切替: {len(race_ids)}候補")
+        race_ids = filter_guessed_race_ids(date_str, race_ids, browser_page)
 
     venues = {}
     for rid in race_ids:
@@ -213,15 +264,11 @@ def scrape_day(date_str, browser_page=None):
                 except Exception:
                     if browser_page is None:
                         raise
-                    browser_page.goto(url, timeout=30000)
-                    browser_page.wait_for_timeout(2500)
-                    html = browser_page.content()
+                    html = load_entry_html_with_browser(browser_page, url)
                 soup = BeautifulSoup(html, "html.parser")
                 entries = parse_entry_table(soup, rid)
                 if not entries and browser_page is not None:
-                    browser_page.goto(url, timeout=30000)
-                    browser_page.wait_for_timeout(3000)
-                    html = browser_page.content()
+                    html = load_entry_html_with_browser(browser_page, url)
                     soup = BeautifulSoup(html, "html.parser")
                     entries = parse_entry_table(soup, rid)
 
@@ -259,6 +306,7 @@ def scrape_entries(days_ahead=7):
     """今日から指定日数先までの出走表を取得"""
     os.makedirs(DATA_DIR, exist_ok=True)
     today = datetime.now(TOKYO_TZ)
+    today_str = today.strftime("%Y%m%d")
     all_days = {}
 
     fallback_browser = None
@@ -276,7 +324,7 @@ def scrape_entries(days_ahead=7):
             if not race_ids:
                 print("  一覧取得なし。直接確認で継続")
 
-            if not race_ids and fallback_page is None:
+            if not race_ids and should_deep_scan(date_str, today) and fallback_page is None:
                 playwright_context = sync_playwright().start()
                 fallback_browser = playwright_context.chromium.launch(headless=True)
                 fallback_page = fallback_browser.new_page()
@@ -304,7 +352,6 @@ def scrape_entries(days_ahead=7):
             playwright_context.stop()
 
     # today_entries.json は当日分
-    today_str = today.strftime("%Y%m%d")
     if today_str in all_days:
         out_path = os.path.join(DATA_DIR, "today_entries.json")
         with open(out_path, "w", encoding="utf-8") as f:

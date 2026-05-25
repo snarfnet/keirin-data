@@ -43,11 +43,11 @@ jobs:
           pip install requests beautifulsoup4 playwright pandas
           playwright install chromium
 
-      - name: Scrape entries (today + 7 days ahead)
+      - name: Scrape entries (today + tomorrow)
         run: |
           cd scripts
           mkdir -p data
-          python scrape_entries.py 7
+          python scrape_entries.py 1
           python publish_if_valid.py entries
         working-directory: .
 
