@@ -21,8 +21,10 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 LIST_RETRIES = 3
 DETAIL_RETRIES = 2
+LIST_TIMEOUT_SECONDS = 5
 BROWSER_NAV_TIMEOUT_MS = 3500
 BROWSER_WAIT_MS = 500
+BROWSER_LIST_TIMEOUT_MS = 5000
 VENUE_CODES = {
     "11": "函館", "12": "青森", "13": "いわき平",
     "21": "弥彦", "22": "前橋", "23": "取手", "24": "宇都宮",
@@ -45,7 +47,11 @@ def get_race_ids(date_str, browser_page=None):
     last_error = None
     for attempt in range(1, LIST_RETRIES + 1):
         try:
-            r = requests.get(url, headers={**HEADERS, "X-Requested-With": "XMLHttpRequest"}, timeout=15)
+            r = requests.get(
+                url,
+                headers={**HEADERS, "X-Requested-With": "XMLHttpRequest"},
+                timeout=LIST_TIMEOUT_SECONDS,
+            )
             r.raise_for_status()
             r.encoding = "utf-8"
             race_ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", r.text)))
@@ -59,8 +65,8 @@ def get_race_ids(date_str, browser_page=None):
         print(f"  レースID取得失敗: {last_error}")
     if browser_page is not None:
         try:
-            browser_page.goto(url, timeout=30000)
-            browser_page.wait_for_timeout(2500)
+            browser_page.goto(url, timeout=BROWSER_LIST_TIMEOUT_MS, wait_until="domcontentloaded")
+            browser_page.wait_for_timeout(BROWSER_WAIT_MS)
             race_ids = sorted(set(re.findall(r"PaybackRaceId_(\d+)", browser_page.content())))
             if race_ids:
                 print(f"  browser fallback found {len(race_ids)} races")
@@ -342,6 +348,9 @@ def scrape_entries(days_ahead=7):
 
             if not race_ids:
                 print("  一覧取得なし。直接確認で継続")
+                if not should_deep_scan(date_str, today):
+                    print("  直接確認対象外のためスキップ")
+                    continue
 
             if not race_ids and should_deep_scan(date_str, today) and fallback_page is None:
                 playwright_context = sync_playwright().start()
