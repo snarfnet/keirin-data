@@ -37,14 +37,24 @@ def publish_entries():
     today = datetime.now(TOKYO_TZ).strftime("%Y%m%d")
     today_path = DATA_DIR / "today_entries.json"
     upcoming_path = DATA_DIR / "upcoming_entries.json"
+    root_today_path = ROOT_DIR / "today_entries.json"
+    root_upcoming_path = ROOT_DIR / "upcoming_entries.json"
 
     if not valid_entry_file(today_path, today):
+        if valid_entry_file(root_today_path, today):
+            print("entries: scraped data empty, but published today_entries.json is already current")
+            return
         print("entries: invalid or empty today_entries.json; keeping previous published data")
         raise SystemExit(1)
 
     upcoming = load_json(upcoming_path) if upcoming_path.exists() else {}
     upcoming_races = upcoming.get("races", [])
     if not upcoming_races or not any(r.get("date") == today and r.get("entries") for r in upcoming_races):
+        root_upcoming = load_json(root_upcoming_path) if root_upcoming_path.exists() else {}
+        root_races = root_upcoming.get("races", [])
+        if any(r.get("date") == today and r.get("entries") for r in root_races):
+            print("entries: scraped upcoming empty, but published upcoming_entries.json is already current")
+            return
         print("entries: invalid or empty upcoming_entries.json; keeping previous published data")
         raise SystemExit(1)
 
