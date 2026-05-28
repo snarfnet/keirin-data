@@ -36,6 +36,13 @@ def main():
     days = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     os.makedirs(DATA_DIR, exist_ok=True)
 
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print("GitHub Actions detected. primary: DMM")
+        clear_fresh_files()
+        scrape_entries_dmm.scrape_entries(days)
+        publish_if_valid.publish_entries()
+        return
+
     print("primary: netkeiba")
     clear_fresh_files()
     scrape_entries.scrape_entries(days)
