@@ -47,8 +47,7 @@ jobs:
         run: |
           cd scripts
           mkdir -p data
-          python -u scrape_entries.py 1
-          python -u publish_if_valid.py entries
+          python -u ensure_entries.py 1
         working-directory: .
 
       - name: Scrape odds

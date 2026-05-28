@@ -59,8 +59,7 @@ function Run-Entries {
     $scriptsDir = Join-Path $RootDir "scripts"
     New-Item -ItemType Directory -Path (Join-Path $scriptsDir "data") -Force | Out-Null
     $python = Join-Path $RootDir ".venv\Scripts\python.exe"
-    Invoke-Step $python @("-u", "scrape_entries.py", $DaysAhead) $scriptsDir
-    Invoke-Step $python @("-u", "publish_if_valid.py", "entries") $scriptsDir
+    Invoke-Step $python @("-u", "ensure_entries.py", $DaysAhead) $scriptsDir
 }
 
 function Run-Odds {

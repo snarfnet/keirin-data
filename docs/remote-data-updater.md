@@ -2,6 +2,8 @@
 
 Use this when GitHub Actions cannot scrape keirin data reliably. The updater runs on a VPS or always-on PC, writes JSON files, commits them, and pushes to GitHub. GitHub Pages then serves the new JSON to the app.
 
+The entry updater first tries netkeiba. If that returns empty data or gets blocked, it falls back to DMM Keirin GraphQL so the job can still run without the Windows desktop machine.
+
 ## GitHub token
 
 Create a fine-grained GitHub token with write access to the `snarfnet/keirin-data` repository contents.

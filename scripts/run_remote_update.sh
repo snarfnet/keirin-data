@@ -45,8 +45,7 @@ run_entries() {
   (
     cd scripts
     mkdir -p data
-    python -u scrape_entries.py "$DAYS_AHEAD"
-    python -u publish_if_valid.py entries
+    python -u ensure_entries.py "$DAYS_AHEAD"
   )
 }
 
