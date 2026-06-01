@@ -60,8 +60,11 @@ def publish_entries():
 
     copy_if_exists("today_entries.json")
     copy_if_exists("upcoming_entries.json")
-    for path in DATA_DIR.glob("entries_*.json"):
-        shutil.copyfile(path, ROOT_DIR / path.name)
+    publish_dates = set(upcoming.get("days") or [])
+    if not publish_dates:
+        publish_dates.add(today)
+    for date_str in sorted(publish_dates):
+        copy_if_exists(f"entries_{date_str}.json")
     print("entries: published")
 
 
