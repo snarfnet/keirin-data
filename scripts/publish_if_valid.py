@@ -78,6 +78,12 @@ def publish_results():
         print("results: empty today_results.json; keeping previous published data")
         return
     copy_if_exists("today_results.json")
+    date_str = payload.get("date")
+    if date_str:
+        dated_name = f"results_{date_str}.json"
+        dated_path = DATA_DIR / dated_name
+        if dated_path.exists():
+            copy_if_exists(dated_name)
     print("results: published")
 
 

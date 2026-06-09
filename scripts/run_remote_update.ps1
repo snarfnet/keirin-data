@@ -75,9 +75,7 @@ function Run-Results {
     $scriptsDir = Join-Path $RootDir "scripts"
     $python = Join-Path $RootDir ".venv\Scripts\python.exe"
     $resultDate = & $python -c "from datetime import datetime,timedelta; from zoneinfo import ZoneInfo; now=datetime.now(ZoneInfo('Asia/Tokyo')); target=now if now.hour>=21 else now-timedelta(days=1); print(target.strftime('%Y%m%d'))"
-    Invoke-Step $python @("-u", "scraper.py", $resultDate, $resultDate) $scriptsDir
-    Invoke-Step $python @("-u", "scrape_results.py", $resultDate) $scriptsDir
-    Invoke-Step $python @("-u", "publish_if_valid.py", "results") $scriptsDir
+    Invoke-Step $python @("-u", "ensure_results.py", $resultDate) $scriptsDir
 }
 
 function Commit-AndPush {

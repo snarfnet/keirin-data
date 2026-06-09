@@ -72,9 +72,7 @@ target = now if now.hour >= 21 else now - timedelta(days=1)
 print(target.strftime("%Y%m%d"))
 PY
 )"
-    python -u scraper.py "$result_date" "$result_date"
-    python -u scrape_results.py "$result_date"
-    python -u publish_if_valid.py results
+    python -u ensure_results.py "$result_date"
   )
 }
 
