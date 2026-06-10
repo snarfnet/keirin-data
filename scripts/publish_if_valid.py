@@ -49,10 +49,19 @@ def publish_entries():
 
     upcoming = load_json(upcoming_path) if upcoming_path.exists() else {}
     upcoming_races = upcoming.get("races", [])
-    if not upcoming_races or not any(r.get("date") == today and r.get("entries") for r in upcoming_races):
+    upcoming_ok = (
+        upcoming.get("date") == today
+        and upcoming_races
+        and any(r.get("date") == today and r.get("entries") for r in upcoming_races)
+    )
+    if not upcoming_ok:
         root_upcoming = load_json(root_upcoming_path) if root_upcoming_path.exists() else {}
         root_races = root_upcoming.get("races", [])
-        if any(r.get("date") == today and r.get("entries") for r in root_races):
+        root_upcoming_ok = (
+            root_upcoming.get("date") == today
+            and any(r.get("date") == today and r.get("entries") for r in root_races)
+        )
+        if root_upcoming_ok:
             print("entries: scraped upcoming empty, but published upcoming_entries.json is already current")
             return
         print("entries: invalid or empty upcoming_entries.json; keeping previous published data")

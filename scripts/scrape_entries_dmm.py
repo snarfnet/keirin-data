@@ -206,6 +206,7 @@ def scrape_entries(days_ahead=1):
     upcoming_path = os.path.join(DATA_DIR, "upcoming_entries.json")
     with open(upcoming_path, "w", encoding="utf-8") as f:
         json.dump({
+            "date": today_str,
             "updated": datetime.now(TOKYO_TZ).strftime("%Y%m%d%H%M"),
             "days": sorted(all_days),
             "races": flat,
