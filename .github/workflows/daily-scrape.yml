@@ -2,6 +2,8 @@ name: Daily Scrape
 
 on:
   schedule:
+    # 05:45 JST = 20:45 UTC (prepare data before the 06:00 note export)
+    - cron: '45 20 * * *'
     # 07:10 JST = 22:10 UTC (morning refresh for today's races)
     - cron: '10 22 * * *'
     # 09:10 JST = 00:10 UTC (late morning retry)

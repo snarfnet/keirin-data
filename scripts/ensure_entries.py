@@ -40,6 +40,12 @@ def main():
         print("GitHub Actions detected. primary: DMM")
         clear_fresh_files()
         scrape_entries_dmm.scrape_entries(days)
+
+        if not is_valid_today():
+            print("DMM empty or stale. fallback: netkeiba")
+            clear_fresh_files()
+            scrape_entries.scrape_entries(days)
+
         publish_if_valid.publish_entries()
         return
 
