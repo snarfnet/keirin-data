@@ -7,7 +7,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import publish_if_valid
-import scrape_entries
 import scrape_entries_dmm
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -51,6 +50,14 @@ def main():
 
     print("primary: netkeiba")
     clear_fresh_files()
+    try:
+        import scrape_entries
+    except ModuleNotFoundError as exc:
+        print(f"primary unavailable: {exc}. fallback: DMM")
+        scrape_entries_dmm.scrape_entries(days)
+        publish_if_valid.publish_entries()
+        return
+
     scrape_entries.scrape_entries(days)
 
     if not is_valid_today():
